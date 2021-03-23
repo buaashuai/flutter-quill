@@ -1,7 +1,20 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/widgets/controller.dart';
 import 'package:flutter_quill/widgets/editor.dart';
+import 'dart:io' as io;
 
+import 'package:flutter_quill/models/documents/document.dart';
+import 'package:flutter_quill/models/documents/nodes/line.dart';
+import 'package:flutter_quill/models/documents/nodes/node.dart';
+import 'package:flutter_quill/models/documents/nodes/leaf.dart';
+import 'package:flutter_quill/models/documents/nodes/block.dart';
+import 'package:flutter_quill/widgets/default_styles.dart';
+import 'package:flutter_quill/widgets/text_line.dart';
+import 'package:flutter_quill/widgets/text_line.dart';
+import 'package:flutter_quill/widgets/text_line.dart';
 import '../widgets/demo_scaffold.dart';
 
 class ReadOnlyPage extends StatefulWidget {
@@ -13,6 +26,74 @@ class _ReadOnlyPageState extends State<ReadOnlyPage> {
   final FocusNode _focusNode = FocusNode();
 
   bool _edit = false;
+  late Document document;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromAssets();
+  }
+
+  Future<void> _loadFromAssets() async {
+    try {
+      final result = await rootBundle.loadString('assets/sample_data.json');
+      document = Document.fromJson(jsonDecode(result));
+      setState(() {});
+    } catch (error) {}
+  }
+
+  Widget _defaultEmbedBuilder(BuildContext context, Embed node) {
+    switch (node.value.type) {
+      case 'image':
+        String imageUrl = node.value.data;
+        return imageUrl.startsWith('http')
+            ? Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  color: Colors.green,
+                  width: 30,
+                  height: 30,
+                  child: Image.network(imageUrl),
+                ),
+              )
+            : Image.file(io.File(imageUrl));
+      default:
+        throw UnimplementedError('Embeddable type "${node.value.type}" is not supported by default embed '
+            'builder of QuillEditor. You must pass your own builder function to '
+            'embedBuilder property of QuillEditor or QuillField widgets.');
+    }
+  }
+
+  List<Widget> _buildChildren(BuildContext context) {
+    Document doc = document;
+    final result = <Widget>[];
+    Map<int, int> indentLevelCounts = {};
+    for (Node node in doc.root.children) {
+      if (node is Line) {
+        TextLine textLine = TextLine(
+          line: node,
+          textDirection: TextDirection.ltr,
+          styles: DefaultStyles.getInstance(context),
+          embedBuilder: _defaultEmbedBuilder,
+        );
+        result.add(textLine);
+      } else if (node is Block) {
+        Widget ww = Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            color: Colors.red,
+            margin: EdgeInsets.only(top: 8),
+            width: 30,
+            height: 30,
+          ),
+        );
+        result.add(ww);
+      } else {
+        throw StateError('Unreachable.');
+      }
+    }
+    return result;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,10 +101,6 @@ class _ReadOnlyPageState extends State<ReadOnlyPage> {
       documentFilename: 'sample_data.json',
       builder: _buildContent,
       showToolbar: _edit == true,
-      floatingActionButton: FloatingActionButton.extended(
-          label: Text(_edit == true ? 'Done' : 'Edit'),
-          onPressed: _toggleEdit,
-          icon: Icon(_edit == true ? Icons.check : Icons.edit)),
     );
   }
 
@@ -35,16 +112,8 @@ class _ReadOnlyPageState extends State<ReadOnlyPage> {
           color: Colors.white,
           border: Border.all(color: Colors.grey.shade200),
         ),
-        child: QuillEditor(
-          controller: controller!,
-          scrollController: ScrollController(),
-          scrollable: true,
-          focusNode: _focusNode,
-          autoFocus: true,
-          readOnly: !_edit,
-          enableInteractiveSelection: true,
-          expands: false,
-          padding: EdgeInsets.zero,
+        child: Wrap(
+          children: _buildChildren(context),
         ),
       ),
     );
