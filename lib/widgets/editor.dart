@@ -380,7 +380,7 @@ class _QuillEditorSelectionGestureDetectorBuilder
     }
     Line line = result.node as Line;
     containerNode.ChildQuery segmentResult =
-        line.queryChild(result.offset, false);
+        line.queryChild(result.offset, true);
     if (segmentResult.node == null) {
       if (line.length == 1) {
         // tapping when no text yet on this line
